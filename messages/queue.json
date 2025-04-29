@@ -1,0 +1,58 @@
+[
+    {
+        "id": 1,
+        "type": "internal",
+        "body": "te6ccgEBAQEAAgAAAHsiYWN0aW9uIjogImRlcG9zaXQiLCJhbW91bnQiOiAxMDB9",
+        "value": { "coins": "100000000" },
+        "name": "Small deposit"
+    },
+    {
+        "id": 2,
+        "type": "internal",
+        "body": "te6ccgEBAQEAAgAAAHsiYWN0aW9uIjogIndpdGhkcmF3IiwgImFtb3VudCI6IDUwfQ==",
+        "value": { "coins": "50000000" },
+        "name": "Withdraw 0.05 TON"
+    },
+    {
+        "id": 3,
+        "type": "internal",
+        "body": "te6ccgEBAQEAAgAAAHsiYWN0aW9uIjogImRlcG9zaXQiLCAiYW1vdW50IjogMTAwMH0=",
+        "value": { "coins": "1000000000" },
+        "name": "Large deposit"
+    },
+    {
+        "id": 4,
+        "type": "external-in",
+        "body": "te6ccgEBAQEAAgAAAHsiYWN0aW9uIjogInF1ZXJ5X2JhbGFuY2UifQ==",
+        "value": { "coins": "0" },
+        "name": "Balance query"
+    },
+    {
+        "id": 5,
+        "type": "internal",
+        "body": "te6ccgEBAQEAAgAAAHsiYWN0aW9uIjogInJlc2V0In0=",
+        "value": { "coins": "10000000" },
+        "name": "Reset contract"
+    },
+    {
+        "id": 6,
+        "type": "internal",
+        "body": "te6ccgEBAQEAAgAAAHsiYWN0aW9uIjogImRlcG9zaXQiLCAiYW1vdW50IjogMH0=",
+        "value": { "coins": "0" },
+        "name": "Zero value test"
+    },
+    {
+        "id": 7,
+        "type": "internal",
+        "body": "te6ccgEBAQEAAgAAAHsiYWN0aW9uIjogImRlcG9zaXQiLCAiYW1vdW50IjogMTIzNDU2Nzg5MH0=",
+        "value": { "coins": "12345678900" },
+        "name": "Max value test"
+    },
+    {
+        "id": 8,
+        "type": "internal",
+        "body": "te6ccgEBAQEAAgAAAHsiYWN0aW9uIjogImludmFsaWRfYWN0aW9uIn0=",
+        "value": { "coins": "100000000" },
+        "name": "Invalid operation"
+    }
+]

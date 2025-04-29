@@ -1,0 +1,97 @@
+"Asm.fif" include
+// automatically generated from `contracts/main.fc` incl:`contracts/imports/stdlib.fc` 
+PROGRAM{
+  DECLPROC load_data
+  DECLPROC save_data
+  DECLPROC recv_internal
+  129615 DECLMETHOD get_contract_storage_data
+  104128 DECLMETHOD balance
+  load_data PROCINLINE:<{
+    c4 PUSH
+    CTOS
+    32 LDU
+    LDMSGADDR
+    LDMSGADDR
+    DROP
+  }>
+  save_data PROCINLINE:<{
+    s0 s2 XCHG
+    NEWC
+    32 STU
+    SWAP
+    STSLICER
+    SWAP
+    STSLICER
+    ENDC
+    c4 POP
+  }>
+  recv_internal PROC:<{
+    s2 POP
+    CTOS
+    4 LDU
+    NIP
+    LDMSGADDR
+    DROP
+    SWAP
+    32 LDU
+    load_data INLINECALLDICT
+    NIP
+    s3 PUSH
+    1 EQINT
+    IFJMP:<{
+      s3 POP
+      NIP
+      INC
+      -ROT
+      save_data INLINECALLDICT
+    }>
+    NIP
+    s2 PUSH
+    2 EQINT
+    IFJMP:<{
+      4 BLKDROP
+    }>
+    s0 s2 XCHG
+    3 EQINT
+    IFJMP:<{
+      s2 s1 PUXC
+      SDEQ
+      103 THROWIFNOT
+      LDGRAMS
+      DROP
+      BALANCE
+      UNPAIR
+      DROP
+      s0 s1 PUSH2
+      GEQ
+      104 THROWIFNOT
+      10000000 PUSHINT
+      SUB
+      MIN
+      1 PUSHINT
+      0 PUSHINT
+      24 PUSHINT
+      NEWC
+      6 STU
+      s0 s4 XCHG2
+      STSLICER
+      ROT
+      STGRAMS
+      s1 s2 XCHG
+      107 STU
+      ENDC
+      SWAP
+      SENDRAWMSG
+    }>
+    3 BLKDROP
+    777 THROW
+  }>
+  get_contract_storage_data PROC:<{
+    load_data INLINECALLDICT
+  }>
+  balance PROC:<{
+    BALANCE
+    UNPAIR
+    DROP
+  }>
+}END>c
