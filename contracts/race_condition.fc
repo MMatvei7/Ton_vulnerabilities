@@ -1,0 +1,53 @@
+#include "imports/stdlib.fc";
+
+const OP_ENLIST = 1;
+const OP_CLAIM  = 2;
+
+(int, slice) _load_state() {
+  slice ds = get_data().begin_parse();
+  int balance = slice_bits(ds) >= 32 ? ds~load_uint(32) : 0;
+  slice owner_address = ds;
+  return (balance, owner_address);
+}
+
+(slice) get_msg_sender(cell in_msg) {
+    slice cs = in_msg.begin_parse();
+	int flags = cs~load_uint(4);
+    slice sender_address = cs~load_msg_addr();
+    return sender_address;
+}
+
+() _save_state(int balance, slice owner_address) impure {
+  set_data(begin_cell().store_uint(balance, 32).store_slice(owner_address).end_cell());
+}
+
+() recv_internal(int msg_value, cell in_msg, slice in_msg_body) impure {
+  var (balance, owner_address) = _load_state();
+  slice sender_address = get_msg_sender(in_msg);
+
+  if (slice_bits(in_msg_body) >= 32) {
+    int op = in_msg_body~load_uint(32);
+    if (op == OP_ENLIST) {
+        balance += msg_value;
+        if (slice_bits(owner_address) == 0) {
+            _save_state(balance, sender_address);
+        } else {
+            _save_state(balance, owner_address);
+        }
+        return();
+    } 
+    if (op == OP_CLAIM) {
+        if (equal_slice_bits(owner_address, sender_address)) {
+            balance = 0;  
+            _save_state(balance, "");
+        }
+        return();
+    }
+  }
+}
+
+() recv_external(slice _) { return (); }
+
+(int, slice) get_state() method_id {
+    return _load_state();
+}
