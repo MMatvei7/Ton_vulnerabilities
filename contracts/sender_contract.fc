@@ -1,0 +1,44 @@
+#include "imports/stdlib.fc";
+
+const OP_SEND_ENLIST = 1;
+
+;; Адрес главного контракта хранится в состоянии
+slice _load_main_address() {
+  slice ds = get_data().begin_parse();
+  slice main_address = ds~load_msg_addr();
+  return main_address;
+}
+
+() send_enlist(slice main_address, int amount) impure {
+  cell msg = begin_cell()
+    .store_uint(0x18, 6)           ;; flags: internal, no bounce
+    .store_slice(main_address)      ;; destination
+    .store_coins(amount)            ;; value to send
+    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1) ;; init/body flags
+    .store_uint(1, 32)              ;; OP_ENLIST
+    .store_uint(amount, 128)        ;; amount in body
+    .end_cell();
+  
+  send_raw_message(msg, 3);        ;; mode 3: carry remaining balance
+}
+
+() recv_internal(int msg_value, cell in_msg, slice in_msg_body) impure {
+  if (slice_bits(in_msg_body) >= 32) {
+    int op = in_msg_body.load_uint(32);
+    
+    if (op == OP_SEND_ENLIST) {
+      int amount = in_msg_body.load_uint(128);
+      slice main_address = _load_main_address();
+      send_enlist(main_address, amount);
+      return();
+    }
+  }
+}
+
+() recv_external(slice _) {
+  return ();
+}
+
+(slice) get_main_address() method_id {
+  return _load_main_address();
+}
