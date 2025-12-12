@@ -1,0 +1,32 @@
+#include "imports/stdlib.fc";
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    slice ds = get_data().begin_parse();
+    int total = 0;
+    if (slice_bits(ds) >= 64) {
+        total = ds~load_uint(64);
+    }
+
+    if (in_msg_body.slice_bits() >= 32) {
+        int op = in_msg_body~load_uint(32);
+        if (op == 1) {  ;; сообщение типа "deposit"
+            total += msg_value;
+        }
+        if (op == 2) {  ;; сообщение типа "claim"
+            if (total > 0) {
+                total = 0;
+            }
+        }
+    }
+
+    set_data(begin_cell().store_uint(total, 64).end_cell());
+}
+
+(int) get_total() method_id {
+    slice ds = get_data().begin_parse();
+    int total = 0;
+    if (slice_bits(ds) == 0) {
+        return 0;
+    }
+    return ds~load_uint(64);
+}
