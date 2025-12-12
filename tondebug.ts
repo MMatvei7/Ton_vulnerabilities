@@ -582,8 +582,8 @@ class TONDebugConsole {
       console.log(`${Colors.FgYellow}ID: ${msg.id}
       Name: ${msg.name || `unnamed`}
       Type: ${msg.type}
-      Body: ${msg.body.toString()}
-      Value: ${msg.value?.coins.toString()}
+      Body: ${msg.body}
+      Value: ${msg.value?.coins}
       ${Colors.Reset}`);
     });
   }
@@ -769,7 +769,7 @@ async function compileContract(contractPath: string): Promise<Cell> {
     })
   );
 
-  console.log(`${Colors.FgGreen}Compiled code saved to${Colors.Reset}` + hexArtifact);
+  console.log(`${Colors.FgGreen}Compiled code saved to ${Colors.Reset}` + hexArtifact);
 
   return codeCell;
 }

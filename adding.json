@@ -2,6 +2,6 @@
   "id": 0,
   "type": "internal",
   "body": "x{00000002}",
-  "value": "5000000000",
+  "value": { "coins": "5000000000" },
   "name": "Deposit"
 }]
