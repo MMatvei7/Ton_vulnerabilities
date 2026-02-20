@@ -1,0 +1,101 @@
+;; =============================================================================
+;; EXAMPLE 3: ThunderFinance — Uncalculated Gas and Unprocessed Bounce
+;; Reference: ThunderFinance (TonBit), Contract Examples.docx
+;; Audit: https://tonbit.xyz/reports/ThunderFinance-Final-Audit-Report.pdf
+;; Repo: https://github.com/Ton-Dynasty/ThunderFinance (fix commit 3ff6f55)
+;;
+;; VULNERABILITY: On deposit we increase lp_supply (state) first, then send
+;; UserDeposit to user's MiniChef. If MiniChef throws (e.g. insufficient TON),
+;; the message bounces but we have no recv_bounced to revert lp_supply or
+;; return LP tokens. User loses LP and contract state is inconsistent.
+;; =============================================================================
+#include "imports/stdlib.fc";
+
+const OP_DEPOSIT = 0xde;
+const OP_WITHDRAW = 0xad;
+
+(int, slice) _load_state() {
+  slice ds = get_data().begin_parse();
+  int lp_supply = 0;
+  slice owner = null();
+  if (slice_bits(ds) >= 64) {
+    lp_supply = ds~load_uint(64);
+    if (slice_bits(ds) >= 2 + 256) {
+      owner = ds~load_msg_addr();
+    }
+  }
+  return (lp_supply, owner);
+}
+
+() _save_state(int lp_supply, slice owner) impure {
+  set_data(begin_cell()
+    .store_uint(lp_supply, 64)
+    .store_slice(owner)
+    .end_cell());
+}
+
+slice get_sender(cell in_msg) {
+  slice cs = in_msg.begin_parse();
+  cs~load_uint(4);
+  return cs~load_msg_addr();
+}
+
+() recv_internal(int msg_value, cell in_msg, slice in_msg_body) impure {
+  slice sender = get_sender(in_msg);
+  if (slice_bits(in_msg_body) < 32) { return (); }
+  int op = in_msg_body~load_uint(32);
+
+  var (lp_supply, owner) = _load_state();
+
+  if (op == OP_DEPOSIT) {
+    int amount = in_msg_body~load_uint(64);
+    if (amount <= 0) { return (); }
+    ;; VULNERABILITY: update state first
+    lp_supply += amount;
+    if (slice_bits(owner) == 0) {
+      _save_state(lp_supply, sender);
+    } else {
+      _save_state(lp_supply, owner);
+    }
+    ;; Then send to user's "MiniChef" — if it throws (e.g. not enough gas/value),
+    ;; we have NO recv_bounced to revert lp_supply or return tokens
+    cell msg = begin_cell()
+      .store_uint(0x18, 6)
+      .store_slice(sender)
+      .store_coins(msg_value - 50000000)
+      .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+      .store_uint(OP_DEPOSIT, 32)
+      .store_uint(amount, 64)
+      .end_cell();
+    send_raw_message(msg, 64);
+    return ();
+  }
+
+  if (op == OP_WITHDRAW) {
+    if (equal_slice_bits(sender, owner)) {
+      int amount = in_msg_body~load_uint(64);
+      if (amount > 0) {
+        if (lp_supply >= amount) {
+          _save_state(lp_supply - amount, owner);
+          cell msg = begin_cell()
+            .store_uint(0x18, 6)
+            .store_slice(sender)
+            .store_coins(amount)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+            .end_cell();
+          send_raw_message(msg, 64);
+        }
+      }
+    }
+    return ();
+  }
+}
+
+;; VULNERABILITY: No recv_bounced implemented. When the message to MiniChef
+;; bounces, lp_supply is not reverted and user's LP is not returned.
+
+() recv_external(slice _) { return (); }
+
+(int, slice) get_state() method_id {
+  return _load_state();
+}

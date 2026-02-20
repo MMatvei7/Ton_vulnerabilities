@@ -1,0 +1,123 @@
+;; =============================================================================
+;; EXAMPLE 2: Aqua Protocol — on_bounce poorly designed / stuck redeem_data
+;; Reference: Aqua Protocol (Beosin), Contract Examples.docx
+;; Audit: https://beosin.com/audits/Aqua_Protocol_202407221416.pdf
+;;
+;; VULNERABILITY: Multi-step redeem stores data in state (redeem_id -> data).
+;; If a later step (e.g. redeem_tick) fails and bounces, recv_bounced may not
+;; clear that redeem_id (e.g. we only handle bounce from step 1, not from tick).
+;; Data stays "stuck", blocking subsequent redeem operations.
+;; =============================================================================
+#include "imports/stdlib.fc";
+
+const OP_START_REDEEM   = 0x1234;
+const OP_REDEEM_TICK    = 0x5678;
+const OP_REDEEM_COMPLETE = 0x9abc;
+
+;; State: redeem_id (32) || active_redeem_cell (optional: redeem_id -> (user, amount, step))
+;; Simplified: we store single active redeem as (redeem_id, user_slice, amount, step)
+(int, slice, int, int) _load_state() {
+  slice ds = get_data().begin_parse();
+  int redeem_id = 0;
+  slice user_addr = null();
+  int amount = 0;
+  int step = 0;
+  if (slice_bits(ds) >= 32) {
+    redeem_id = ds~load_uint(32);
+    if (slice_bits(ds) >= 2 + 256 + 64 + 32) {
+      user_addr = ds~load_msg_addr();
+      amount = ds~load_uint(64);
+      step = ds~load_uint(32);
+    }
+  }
+  return (redeem_id, user_addr, amount, step);
+}
+
+() _save_state(int redeem_id, slice user_addr, int amount, int step) impure {
+  set_data(begin_cell()
+    .store_uint(redeem_id, 32)
+    .store_slice(user_addr)
+    .store_uint(amount, 64)
+    .store_uint(step, 32)
+    .end_cell());
+}
+
+() _clear_redeem() impure {
+  _save_state(0, null(), 0, 0);
+}
+
+slice get_sender(cell in_msg) {
+  slice cs = in_msg.begin_parse();
+  cs~load_uint(4);
+  return cs~load_msg_addr();
+}
+
+() recv_internal(int msg_value, cell in_msg, slice in_msg_body) impure {
+  slice sender = get_sender(in_msg);
+  if (slice_bits(in_msg_body) < 32) { return (); }
+  int op = in_msg_body~load_uint(32);
+
+  var (redeem_id, user_addr, amount, step) = _load_state();
+
+  ;; Start redeem: store data, send to "next contract" (step 2)
+  if (op == OP_START_REDEEM) {
+    int amount_redeem = in_msg_body~load_uint(64);
+    int next_redeem_id = redeem_id + 1;
+    _save_state(next_redeem_id, sender, amount_redeem, 1);
+    ;; Send to "redeem_tick" — if that bounces we must clear state in recv_bounced
+    ;; VULN: we send with op OP_REDEEM_TICK; bounce handler below only clears
+    ;; when original op was OP_START_REDEEM, not when it was OP_REDEEM_TICK.
+    cell msg = begin_cell()
+      .store_uint(0x18, 6)
+      .store_slice(sender)
+      .store_coins(100000000)
+      .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+      .store_uint(OP_REDEEM_TICK, 32)
+      .store_uint(next_redeem_id, 32)
+      .end_cell();
+    send_raw_message(msg, 64);
+    return ();
+  }
+
+  ;; Redeem tick (step 2) — called by "next contract" or we simulate internally
+  if (op == OP_REDEEM_TICK) {
+    if (slice_bits(in_msg_body) < 64) { return (); }
+    int rid = in_msg_body~load_uint(32);
+    if (rid != redeem_id) { return (); }
+    if (step != 1) { return (); }
+    _save_state(redeem_id, user_addr, amount, 2);
+    ;; Could send further; if this bounces, recv_bounced might not clear (see below)
+    return ();
+  }
+
+  if (op == OP_REDEEM_COMPLETE) {
+    if (step == 2) {
+      _clear_redeem();
+    }
+    return ();
+  }
+}
+
+;; Bounce handler: VULNERABILITY — we only clear when body starts with OP_START_REDEEM.
+;; Bounced message body: 0xffffffff (32) then first 224 bits of original body.
+;; So if original was OP_REDEEM_TICK (sent from us to user/mini-contract), the
+;; bounce body has 0xffffffff then OP_REDEEM_TICK... We do NOT clear state for that,
+;; so redeem stays stuck.
+() recv_bounced(slice in_msg_body) impure {
+  if (slice_bits(in_msg_body) < 64) { return (); }
+  int magic = in_msg_body~load_uint(32);
+  ;; magic is 0xffffffff for bounced
+  if (slice_bits(in_msg_body) < 32) { return (); }
+  int orig_op = in_msg_body~load_uint(32);
+  ;; Only clear when the bounced message was START_REDEEM, not REDEEM_TICK
+  if (orig_op == OP_START_REDEEM) {
+    _clear_redeem();
+  }
+  ;; VULN: when orig_op == OP_REDEEM_TICK we do NOT clear -> stuck redeem_data
+}
+
+() recv_external(slice _) { return (); }
+
+(int, slice, int, int) get_redeem_state() method_id {
+  return _load_state();
+}

@@ -1,3 +1,11 @@
+;; =============================================================================
+;; EXAMPLE 1: Race condition (ENLIST/owner) — User Fund Loss Due to Race Conditions
+;; Reference: MeMeStore (TonBit) BCJ-4, Contract Examples.docx
+;; Audit: https://tonbit.xyz/reports/20240708-MeMeStore-Final-Audit-Report.pdf
+;;
+;; VULNERABILITY: Two ENLIST messages can race; both see empty owner and both
+;; can become "owner". Later CLAIM allows only one to withdraw — unfair or loss.
+;; =============================================================================
 #include "imports/stdlib.fc";
 
 const OP_ENLIST = 1;
